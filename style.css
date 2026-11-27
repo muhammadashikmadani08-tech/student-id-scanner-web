@@ -157,6 +157,13 @@ section.tab.active { display: block; }
   padding: 12px 14px; margin-bottom: 8px; font-size: 16px;
 }
 .history-row .time { color: var(--muted); white-space: nowrap; }
+.holiday-row {
+  display: flex; justify-content: space-between; gap: 10px;
+  background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--gold);
+  border-radius: 12px;
+  padding: 12px 14px; margin-bottom: 8px; font-size: 16px;
+}
+.holiday-row .time { color: var(--muted); white-space: nowrap; font-size: 14px; }
 .empty { text-align: center; color: var(--muted); padding: 24px 10px; font-size: 16px; }
 #loginScreen { max-width: 480px; margin: 60px auto; text-align: center; }
 #loginScreen p { color: var(--muted); margin: 12px 0 20px; line-height: 1.7; }

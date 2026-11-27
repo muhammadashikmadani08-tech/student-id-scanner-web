@@ -35,6 +35,7 @@
       <button type="button" data-tab="scan" class="active">📷 স্ক্যান</button>
       <button type="button" data-tab="students">👥 ছাত্ররা</button>
       <button type="button" data-tab="history">🕘 স্ক্যান হিস্ট্রি</button>
+      <button type="button" data-tab="holidays">📅 ছুটির দিন</button>
     </nav>
 
     <section id="tab-scan" class="tab active">
@@ -73,7 +74,14 @@
 
     <section id="tab-history" class="tab">
       <h2 style="margin-bottom:12px;">আজকের স্ক্যান</h2>
+      <button id="exportTodayBtn" class="btn-outline" type="button" style="margin-bottom:12px;">আজকের হাজিরা CSV ডাউনলোড</button>
       <div id="historyList"></div>
+    </section>
+
+    <section id="tab-holidays" class="tab">
+      <h2 style="margin-bottom:12px;">ছুটির দিন</h2>
+      <p class="note" style="margin:0 0 12px;text-align:left;">ছুটির দিনগুলো ফোনের অ্যাপ থেকে যোগ করা হয়; এখানে শুধু দেখা যাবে, যোগ বা পরিবর্তন করা যাবে না।</p>
+      <div id="holidaysList"></div>
     </section>
   </div>
 </main>

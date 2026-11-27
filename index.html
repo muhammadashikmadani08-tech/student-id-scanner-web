@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student ID Scanner — ওয়েব ভার্সন</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">▣</div>
+    <h1><span id="institutionName">Student ID Scanner</span><small>ওয়েব ভার্সন — ল্যাপটপ কিয়স্ক</small></h1>
+  </div>
+  <div id="authArea">
+    <span id="userEmail" class="hidden"></span>
+    <button id="signOutBtn" class="btn-ghost hidden" type="button">লগআউট</button>
+  </div>
+</header>
+
+<main>
+  <div id="loginScreen" class="card">
+    <h2>স্বাগতম</h2>
+    <p>ফোনের অ্যাপে যে Gmail দিয়ে লগইন করেছেন, একই Gmail দিয়ে এখানে লগইন করুন। একই Gmail মানেই একই ছাত্রের তথ্য, একই হাজিরা।</p>
+    <button id="signInBtn" class="btn-gold" type="button">Google দিয়ে লগইন করুন</button>
+    <p id="loginError" class="error hidden"></p>
+  </div>
+
+  <div id="appScreen" class="hidden">
+    <nav class="tabs">
+      <button type="button" data-tab="scan" class="active">📷 স্ক্যান</button>
+      <button type="button" data-tab="students">👥 ছাত্ররা</button>
+      <button type="button" data-tab="history">🕘 স্ক্যান হিস্ট্রি</button>
+    </nav>
+
+    <section id="tab-scan" class="tab active">
+      <div class="clock"><span id="clockTime">--:--:--</span><small id="clockDate"></small></div>
+      <div class="mode-switch scan-controls">
+        <button id="modeAttendanceBtn" class="btn-green" type="button">হাজিরা স্ক্যান</button>
+        <button id="modeInfoBtn" class="btn-outline" type="button">তথ্য দেখুন</button>
+      </div>
+      <p class="note" id="modeNote">হাজিরা মোড: স্ক্যান করলেই হাজিরা লেখা হবে, কাউকে থাকতে হবে না।</p>
+      <div class="scanner" id="scannerBox">
+        <video id="video" playsinline muted></video>
+        <div class="frame hidden" id="scanFrame"><div class="scanline"></div></div>
+        <div class="scanner-off" id="scannerOff">
+          <p>ক্যামেরা বন্ধ আছে।<br>স্ক্যান শুরু করতে নিচের বোতামে চাপ দিন।</p>
+        </div>
+      </div>
+      <p id="cameraError" class="error hidden"></p>
+      <div class="scan-controls">
+        <button id="cameraBtn" class="btn-green" type="button">ক্যামেরা চালু করুন</button>
+        <button id="stopCameraBtn" class="btn-outline hidden" type="button">ক্যামেরা বন্ধ করুন</button>
+      </div>
+      <p class="counter">স্ক্যান হয়েছে: আজ <b id="todayCount">0</b> জন</p>
+      <div id="scanResult"></div>
+      <div class="manual">
+        <input id="manualId" type="text" placeholder="আইডি লিখুন (যেমন STD-1001)" autocomplete="off">
+        <button id="manualBtn" class="btn-green" type="button">খুঁজুন</button>
+      </div>
+      <p class="note">ক্যামেরা না চললে উপরে আইডি লিখেও স্ক্যান করা যাবে। ছাত্রের ছবি শুধু ফোনে থাকে, তাই ল্যাপটপে ছবি দেখা যাবে না।</p>
+    </section>
+
+    <section id="tab-students" class="tab">
+      <div class="searchbar"><input id="searchInput" type="text" placeholder="আইডি, নাম, শ্রেণি বা রোল দিয়ে খুঁজুন…" autocomplete="off"></div>
+      <div id="studentsList"></div>
+      <div id="studentProfile" class="card profile hidden"></div>
+    </section>
+
+    <section id="tab-history" class="tab">
+      <h2 style="margin-bottom:12px;">আজকের স্ক্যান</h2>
+      <div id="historyList"></div>
+    </section>
+  </div>
+</main>
+
+<canvas id="decodeCanvas" class="hidden"></canvas>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

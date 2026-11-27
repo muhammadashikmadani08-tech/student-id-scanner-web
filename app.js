@@ -4,6 +4,8 @@
  *   users/{uid}/attendance/{studentId_yyyy-MM-dd}
  *   users/{uid}/history/{autoId}
  *   users/{uid}/settings/profile
+ *   users/{uid}/holidays/{yyyy-MM-dd}  {date, title} — written by the
+ *     scanner app; read-only here (live list, no add/edit/delete).
  * Read-only + scanning only: no student add/edit/delete, no PIN, no seeding.
  */
 (function () {
@@ -24,6 +26,7 @@
   var students = [];
   var studentsById = {};
   var historyDocs = [];
+  var holidays = [];
   var unsubscribers = [];
   var weekOffset = 0;
   var selectedStudentId = null;
@@ -111,7 +114,8 @@
       stopCamera();
       unsubscribers.forEach(function (u) { u(); });
       unsubscribers = [];
-      students = []; studentsById = {}; historyDocs = [];
+      students = []; studentsById = {}; historyDocs = []; holidays = [];
+      renderHolidays();
       $("loginScreen").classList.remove("hidden");
       $("appScreen").classList.add("hidden");
       $("userEmail").classList.add("hidden");
@@ -125,6 +129,7 @@
   function studentsRef() { return userDoc().collection("students"); }
   function attendanceRef() { return userDoc().collection("attendance"); }
   function historyRef() { return userDoc().collection("history"); }
+  function holidaysRef() { return userDoc().collection("holidays"); }
 
   function startListeners() {
     unsubscribers.push(userDoc().collection("settings").doc("profile").onSnapshot(function (snap) {
@@ -158,6 +163,19 @@
         if (a.studentId) seen[a.studentId] = true;
       });
       $("todayCount").textContent = Object.keys(seen).length;
+    }));
+    // Holidays: read-only live list, same listener pattern as above.
+    // Sorted by date ascending; the doc id is the yyyy-MM-dd date, so
+    // fall back to it when the date field is missing.
+    unsubscribers.push(holidaysRef().orderBy("date").onSnapshot(function (snap) {
+      holidays = snap.docs.map(function (d) {
+        var h = d.data() || {};
+        return { date: h.date || d.id, title: h.title || "" };
+      });
+      holidays.sort(function (a, b) {
+        return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0);
+      });
+      renderHolidays();
     }));
   }
 
@@ -449,10 +467,12 @@
       (s.phone ? "<br>মোবাইল: " + escapeHtml(s.phone) : "") + "</p>" +
       '<div class="week-nav"><button type="button" class="btn-outline" id="prevWeek">← আগের সপ্তাহ</button>' +
       '<button type="button" class="btn-outline" id="nextWeek">পরের সপ্তাহ →</button></div>' +
+      '<button type="button" class="btn-outline" id="weekCsvBtn" style="margin:8px 0;">সাপ্তাহিক হাজিরা CSV ডাউনলোড (সব ছাত্র)</button>' +
       '<div id="weekRows"><p class="empty">হাজিরা লোড হচ্ছে…</p></div>' +
       '<p class="footnote">' + FOOTNOTE + "</p>";
     $("prevWeek").addEventListener("click", function () { weekOffset--; renderProfile(); });
     $("nextWeek").addEventListener("click", function () { weekOffset++; renderProfile(); });
+    $("weekCsvBtn").addEventListener("click", exportWeekCsv);
     loadWeekAttendance(s.studentId);
   }
 
@@ -492,6 +512,76 @@
     });
   }
 
+  /* ---------- Attendance CSV export ---------- */
+  var CSV_HEADER = "Date,Student ID,Name,Class,Roll,Status,Scan Time,Session";
+
+  function csvEscape(v) {
+    return '"' + String(v == null ? "" : v).replace(/"/g, "") + '"';
+  }
+
+  /* Same status rules as the weekly view and the Android app: a record
+   * means present (with Dhaka scan time + morning/afternoon); a past
+   * date, or today at/after 20:00, with no record means absent; anything
+   * else is still pending. Returns [status, scanTime, session]. */
+  function attendanceStatus(rec, ds, todayStr, nowHour) {
+    if (rec) {
+      return ["উপস্থিত", formatTime(rec.scannedAt), dhakaHour(rec.scannedAt) < 12 ? "সকাল" : "বিকেল"];
+    }
+    if (ds < todayStr || (ds === todayStr && nowHour >= 20)) return ["অনুপস্থিত", "", ""];
+    return ["এখনো বাকি", "", ""];
+  }
+
+  function attendanceCsvRows(byKey, dates) {
+    var todayStr = dateString(Date.now());
+    var nowHour = dhakaHour(Date.now());
+    var lines = [CSV_HEADER];
+    students.forEach(function (s) {
+      dates.forEach(function (ds) {
+        var st = attendanceStatus(byKey[s.studentId + "_" + ds], ds, todayStr, nowHour);
+        lines.push([ds, s.studentId, s.name, s.className, s.roll, st[0], st[1], st[2]].map(csvEscape).join(","));
+      });
+    });
+    return lines.join("\n") + "\n";
+  }
+
+  function downloadCsv(filename, text) {
+    var blob = new Blob(["\uFEFF" + text], { type: "text/csv;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+
+  /* Today's attendance, one row per student. */
+  function exportTodayCsv() {
+    var todayStr = dateString(Date.now());
+    attendanceRef().where("date", "==", todayStr).get().then(function (snap) {
+      var byKey = {};
+      snap.docs.forEach(function (d) {
+        var a = d.data() || {};
+        if (a.studentId && a.date) byKey[a.studentId + "_" + a.date] = a;
+      });
+      downloadCsv("attendance-" + todayStr + ".csv", attendanceCsvRows(byKey, [todayStr]));
+    });
+  }
+
+  /* Current (viewed) Sat-Fri week, one row per student per day. */
+  function exportWeekCsv() {
+    attendanceRef().get().then(function (snap) {
+      var byKey = {};
+      snap.docs.forEach(function (d) {
+        var a = d.data() || {};
+        if (a.studentId && a.date) byKey[a.studentId + "_" + a.date] = a;
+      });
+      var days = weekDates(weekOffset).map(utcDateString);
+      downloadCsv("attendance-week-" + days[0] + ".csv", attendanceCsvRows(byKey, days));
+    });
+  }
+
+  $("exportTodayBtn").addEventListener("click", exportTodayCsv);
+
   /* ---------- History tab ---------- */
   function renderHistory() {
     var box = $("historyList");
@@ -508,6 +598,29 @@
       return '<div class="history-row"><span><b>' + escapeHtml(name) + "</b><br>" +
         '<span style="color:var(--muted);font-size:14px;">' + escapeHtml(detail) + "</span></span>" +
         '<span class="time">' + formatTime(h.scannedAt) + "</span></div>";
+    }).join("");
+  }
+  /* ---------- Holidays tab (read-only) ---------- */
+  function formatHolidayDate(dateStr) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr || "").trim());
+    if (!m) return String(dateStr || "");
+    var day = new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
+    return new Intl.DateTimeFormat("bn-BD", {
+      timeZone: "UTC", weekday: "long", year: "numeric", month: "long", day: "numeric"
+    }).format(day);
+  }
+
+  function renderHolidays() {
+    var box = $("holidaysList");
+    if (!box) return;
+    if (!holidays.length) {
+      box.innerHTML = '<p class="empty">কোনো ছুটির দিন নেই।</p>';
+      return;
+    }
+    box.innerHTML = holidays.map(function (h) {
+      return '<div class="holiday-row"><span><b>' + escapeHtml(h.title || "ছুটি") + "</b><br>" +
+        '<span style="color:var(--muted);font-size:14px;">' + escapeHtml(formatHolidayDate(h.date)) + "</span></span>" +
+        '<span class="time">' + escapeHtml(h.date) + "</span></div>";
     }).join("");
   }
 })();
